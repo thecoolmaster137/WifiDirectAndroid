@@ -1,0 +1,17 @@
+name: wifi_direct_messenger
+description: A Flutter app for offline messaging using Wi-Fi Direct
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.2
+  shared_preferences: ^2.0.15
+  permission_handler: ^11.0.1
+  path_provider: ^2.1.2
+
+flutter:
+  uses-material-design: true

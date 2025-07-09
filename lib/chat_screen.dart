@@ -1,0 +1,94 @@
+import 'package:flutter/material.dart';
+import 'socket_controller.dart';
+import 'app_logger.dart';
+
+class ChatScreen extends StatefulWidget {
+  final bool isHost;
+  final String hostIp;
+
+  const ChatScreen({super.key, required this.isHost, required this.hostIp});
+
+  @override
+  State<ChatScreen> createState() => _ChatScreenState();
+}
+
+class _ChatScreenState extends State<ChatScreen> {
+  final _controller = TextEditingController();
+  final List<String> messages = [];
+  late SocketController socketController;
+
+  @override
+  void initState() {
+    super.initState();
+    socketController = SocketController();
+    _initConnection();
+  }
+
+  Future<void> _initConnection() async {
+    try {
+      if (widget.isHost) {
+        await AppLogger.log('Starting server as host. Host IP: ${widget.hostIp}');
+        await socketController.startServer(onMessage: _onMessage);
+      } else {
+        await AppLogger.log('Connecting as client to host IP: ${widget.hostIp}');
+        await socketController.connectToHost(widget.hostIp, onMessage: _onMessage);
+      }
+      await AppLogger.log('Connection established.');
+    } catch (e) {
+      await AppLogger.log('Error establishing connection: $e');
+    }
+  }
+
+  void _onMessage(String msg) async {
+    setState(() {
+      messages.add("Peer: $msg");
+    });
+    await AppLogger.log('Received message: $msg');
+  }
+
+  void sendMessage() async {
+    final text = _controller.text.trim();
+    if (text.isNotEmpty) {
+      socketController.sendMessage(text);
+      setState(() {
+        messages.add("Me: $text");
+        _controller.clear();
+      });
+      await AppLogger.log('Sent message: $text');
+    }
+  }
+
+  @override
+  void dispose() {
+    socketController.close();
+    AppLogger.log('ChatScreen disposed.');
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    AppLogger.log('Building ChatScreen UI. isHost: ${widget.isHost}, hostIp: ${widget.hostIp}');
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.isHost ? 'Host Chat' : 'Client Chat')),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView.builder(
+              itemCount: messages.length,
+              itemBuilder: (_, i) => ListTile(title: Text(messages[i])),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                Expanded(child: TextField(controller: _controller)),
+                IconButton(onPressed: sendMessage, icon: const Icon(Icons.send)),
+              ],
+            ),
+          )
+        ],
+      ),
+    );
+  }
+}
