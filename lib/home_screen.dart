@@ -121,6 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     AppLogger.log('Building HomeScreen UI.');
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: const Text('Wi-Fi Hotspot Chat'),
@@ -132,37 +133,93 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: ListView(
-          children: [
-            ElevatedButton(
-              onPressed: createHotspot,
-              child: const Text('Create Hotspot (Host)'),
+      body: Center(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Card(
+                  elevation: 3,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Host a Chat',
+                          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: createHotspot,
+                          icon: const Icon(Icons.wifi_tethering),
+                          label: const Text('Create Hotspot'),
+                        ),
+                        if (ssid != null && password != null && hostIp != null) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.blue[50],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('SSID: $ssid', style: theme.textTheme.bodyMedium),
+                                Text('Password: $password', style: theme.textTheme.bodyMedium),
+                                Text('Host IP: $hostIp', style: theme.textTheme.bodyMedium),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          ElevatedButton.icon(
+                            onPressed: startHostChat,
+                            icon: const Icon(Icons.chat),
+                            label: const Text('Start Chat as Host'),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 32),
+                Card(
+                  elevation: 3,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Text(
+                          'Join as Client',
+                          style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _ipController,
+                          decoration: const InputDecoration(
+                            labelText: 'Enter Host IP',
+                            prefixIcon: Icon(Icons.dns),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ElevatedButton.icon(
+                          onPressed: joinChat,
+                          icon: const Icon(Icons.login),
+                          label: const Text('Join Chat'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
-            if (ssid != null && password != null && hostIp != null) ...[
-              Text('SSID: $ssid'),
-              Text('Password: $password'),
-              Text('Host IP: $hostIp'),
-              ElevatedButton(
-                onPressed: startHostChat,
-                child: const Text('Start Chat as Host'),
-              ),
-              const Divider(),
-            ],
-            const SizedBox(height: 24),
-            const Text('Join as Client:'),
-            TextField(
-              controller: _ipController,
-              decoration: const InputDecoration(
-                labelText: 'Enter Host IP',
-              ),
-            ),
-            ElevatedButton(
-              onPressed: joinChat,
-              child: const Text('Join Chat'),
-            ),
-          ],
+          ),
         ),
       ),
     );

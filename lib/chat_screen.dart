@@ -67,27 +67,77 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    AppLogger.log('Building ChatScreen UI. isHost: ${widget.isHost}, hostIp: ${widget.hostIp}');
+    AppLogger.log('Building ChatScreen UI. isHost:  [${widget.isHost}, hostIp: ${widget.hostIp}');
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(widget.isHost ? 'Host Chat' : 'Client Chat')),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              itemCount: messages.length,
-              itemBuilder: (_, i) => ListTile(title: Text(messages[i])),
+      body: Container(
+        color: Colors.grey[50],
+        child: Column(
+          children: [
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                itemCount: messages.length,
+                itemBuilder: (_, i) {
+                  final isMe = messages[i].startsWith('Me:');
+                  final msg = messages[i].replaceFirst(RegExp(r'^(Me:|Peer:) '), '');
+                  return Align(
+                    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: isMe ? Colors.blueAccent : Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        msg,
+                        style: TextStyle(
+                          color: isMe ? Colors.white : Colors.black87,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(child: TextField(controller: _controller)),
-                IconButton(onPressed: sendMessage, icon: const Icon(Icons.send)),
-              ],
+            Card(
+              margin: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              elevation: 2,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _controller,
+                        decoration: const InputDecoration(
+                          hintText: 'Type a message...',
+                          border: InputBorder.none,
+                        ),
+                        onSubmitted: (_) => sendMessage(),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: sendMessage,
+                      icon: const Icon(Icons.send, color: Colors.blueAccent),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          )
-        ],
+          ],
+        ),
       ),
     );
   }
