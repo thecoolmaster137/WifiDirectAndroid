@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'socket_controller.dart';
 import 'app_logger.dart';
+import 'package:flutter/services.dart';
 
 class ChatScreen extends StatefulWidget {
   final bool isHost;
@@ -44,17 +45,19 @@ class _ChatScreenState extends State<ChatScreen> {
       messages.add("Peer: $msg");
     });
     await AppLogger.log('Received message: $msg');
+    HapticFeedback.lightImpact();
   }
 
   void sendMessage() async {
     final text = _controller.text.trim();
     if (text.isNotEmpty) {
-      socketController.sendMessage(text);
+      await socketController.sendMessage(text);
       setState(() {
         messages.add("Me: $text");
         _controller.clear();
       });
       await AppLogger.log('Sent message: $text');
+      HapticFeedback.lightImpact();
     }
   }
 
