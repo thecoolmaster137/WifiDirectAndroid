@@ -1,5 +1,5 @@
-name: wifi_direct_messenger
-description: A Flutter app for offline messaging using Wi-Fi Direct
+name: ble_chat_messenger
+description: A Flutter app for offline messaging using Bluetooth Low Energy (BLE)
 version: 1.0.0+1
 
 environment:
@@ -13,6 +13,7 @@ dependencies:
   permission_handler: ^11.0.1
   path_provider: ^2.1.2
   cryptography: ^2.7.0
+  flutter_reactive_ble: ^5.0.2
   # vibration: ^1.7.4
 
 flutter:

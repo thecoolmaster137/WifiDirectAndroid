@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 import 'home_screen.dart';
 
 void main() {
-  runApp(const WiFiHotspotMessengerApp());
+  runApp(const BleChatMessengerApp());
 }
 
-class WiFiHotspotMessengerApp extends StatelessWidget {
-  const WiFiHotspotMessengerApp({super.key});
+class BleChatMessengerApp extends StatelessWidget {
+  const BleChatMessengerApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Wi-Fi Hotspot Messenger',
+      title: 'BLE Chat Messenger',
       theme: ThemeData(
         brightness: Brightness.light,
         colorScheme: ColorScheme.fromSeed(

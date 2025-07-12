@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'hotspot_controller.dart';
-import 'socket_controller.dart';
 import 'chat_screen.dart';
-import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
 import 'app_logger.dart';
 
@@ -14,7 +11,7 @@ Future<void> ensurePermissions() async {
   await AppLogger.log('Nearby Wi-Fi Devices permission status: ' + nearbyStatus.toString());
   if (!locationStatus.isGranted || !nearbyStatus.isGranted) {
     await AppLogger.log('Permission denied.');
-    throw Exception('Location and Nearby Devices permissions are required to create hotspot.');
+    throw Exception('Location and Nearby Devices permissions are required for BLE chat.');
   }
   await AppLogger.log('All required permissions granted.');
 }
@@ -27,69 +24,49 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String? ssid;
-  String? password;
-  String? hostIp;
-  final _ipController = TextEditingController();
-
-  void createHotspot() async {
+  void startHostChat() async {
     try {
-      await AppLogger.log('Starting hotspot creation...');
+      await AppLogger.log('Starting BLE host chat...');
       await ensurePermissions();
-      final info = await HotspotController.createHotspot();
-      await AppLogger.log('Hotspot info: ' + info.toString());
-      setState(() {
-        ssid = info['ssid'];
-        password = info['password'];
-      });
-      await AppLogger.log('Detecting local IP address...');
-      for (var interface in await NetworkInterface.list()) {
-        for (var addr in interface.addresses) {
-          if (addr.type == InternetAddressType.IPv4 && !addr.isLoopback) {
-            setState(() {
-              hostIp = addr.address;
-            });
-            await AppLogger.log('Local IP detected: $hostIp');
-            break;
-          }
-        }
-      }
-      await AppLogger.log('Hotspot creation and IP detection complete.');
+      await AppLogger.log('Navigating to ChatScreen as BLE host');
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const ChatScreen(
+            isHost: true,
+          ),
+        ),
+      );
     } catch (e) {
-      await AppLogger.log('Error creating hotspot: ' + e.toString());
+      await AppLogger.log('Error starting BLE host: ' + e.toString());
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error creating hotspot: ' + e.toString())),
+          SnackBar(content: Text('Error starting BLE host: ' + e.toString())),
         );
       }
     }
   }
 
-  void joinChat() async {
-    await AppLogger.log('Navigating to ChatScreen as client. Host IP: ' + _ipController.text.trim());
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ChatScreen(
-          isHost: false,
-          hostIp: _ipController.text.trim(),
-        ),
-      ),
-    );
-  }
-
-  void startHostChat() async {
-    await AppLogger.log('Navigating to ChatScreen as host. Host IP: $hostIp');
-    if (hostIp != null) {
+  void startClientChat() async {
+    try {
+      await AppLogger.log('Starting BLE client chat...');
+      await ensurePermissions();
+      await AppLogger.log('Navigating to ChatScreen as BLE client');
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ChatScreen(
-            isHost: true,
-            hostIp: hostIp!,
+          builder: (_) => const ChatScreen(
+            isHost: false,
           ),
         ),
       );
+    } catch (e) {
+      await AppLogger.log('Error starting BLE client: ' + e.toString());
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error starting BLE client: ' + e.toString())),
+        );
+      }
     }
   }
 
@@ -124,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Wi-Fi Hotspot Chat'),
+        title: const Text('BLE Chat Messenger'),
         actions: [
           IconButton(
             icon: const Icon(Icons.article),
@@ -149,39 +126,21 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          'Host a Chat',
+                          'Host a BLE Chat',
                           style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
-                          onPressed: createHotspot,
-                          icon: const Icon(Icons.wifi_tethering),
-                          label: const Text('Create Hotspot'),
+                          onPressed: startHostChat,
+                          icon: const Icon(Icons.bluetooth),
+                          label: const Text('Start BLE Host'),
                         ),
-                        if (ssid != null && password != null && hostIp != null) ...[
-                          const SizedBox(height: 16),
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.blue[50],
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text('SSID: $ssid', style: theme.textTheme.bodyMedium),
-                                Text('Password: $password', style: theme.textTheme.bodyMedium),
-                                Text('Host IP: $hostIp', style: theme.textTheme.bodyMedium),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          ElevatedButton.icon(
-                            onPressed: startHostChat,
-                            icon: const Icon(Icons.chat),
-                            label: const Text('Start Chat as Host'),
-                          ),
-                        ],
+                        const SizedBox(height: 12),
+                        Text(
+                          'Create a BLE service that other devices can discover and connect to.',
+                          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+                          textAlign: TextAlign.center,
+                        ),
                       ],
                     ),
                   ),
@@ -196,22 +155,20 @@ class _HomeScreenState extends State<HomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         Text(
-                          'Join as Client',
+                          'Join as BLE Client',
                           style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 16),
-                        TextField(
-                          controller: _ipController,
-                          decoration: const InputDecoration(
-                            labelText: 'Enter Host IP',
-                            prefixIcon: Icon(Icons.dns),
-                          ),
+                        ElevatedButton.icon(
+                          onPressed: startClientChat,
+                          icon: const Icon(Icons.bluetooth_searching),
+                          label: const Text('Scan & Connect'),
                         ),
                         const SizedBox(height: 12),
-                        ElevatedButton.icon(
-                          onPressed: joinChat,
-                          icon: const Icon(Icons.login),
-                          label: const Text('Join Chat'),
+                        Text(
+                          'Scan for nearby BLE devices and connect to start chatting.',
+                          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+                          textAlign: TextAlign.center,
                         ),
                       ],
                     ),

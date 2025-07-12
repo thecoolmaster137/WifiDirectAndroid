@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'socket_controller.dart';
+import 'ble_chat_controller.dart';
 import 'app_logger.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 
 class ChatScreen extends StatefulWidget {
   final bool isHost;
-  final String hostIp;
 
-  const ChatScreen({super.key, required this.isHost, required this.hostIp});
+  const ChatScreen({super.key, required this.isHost});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -16,28 +16,47 @@ class ChatScreen extends StatefulWidget {
 class _ChatScreenState extends State<ChatScreen> {
   final _controller = TextEditingController();
   final List<String> messages = [];
-  late SocketController socketController;
+  late BleChatController bleController;
+  Stream<DiscoveredDevice>? _scanStream;
+  List<DiscoveredDevice> _foundPeers = [];
+  bool _isHost = false;
+  bool _connected = false;
 
   @override
   void initState() {
     super.initState();
-    socketController = SocketController();
-    _initConnection();
+    bleController = BleChatController();
+    if (widget.isHost) {
+      _isHost = true;
+      _startAdvertising();
+    } else {
+      _startScanning();
+    }
   }
 
-  Future<void> _initConnection() async {
-    try {
-      if (widget.isHost) {
-        await AppLogger.log('Starting server as host. Host IP: ${widget.hostIp}');
-        await socketController.startServer(onMessage: _onMessage);
-      } else {
-        await AppLogger.log('Connecting as client to host IP: ${widget.hostIp}');
-        await socketController.connectToHost(widget.hostIp, onMessage: _onMessage);
+  void _startAdvertising() async {
+    await bleController.startAdvertising();
+    setState(() {
+      _connected = true; // Host is ready
+    });
+  }
+
+  void _startScanning() {
+    _scanStream = bleController.scanForPeers();
+    _scanStream!.listen((device) {
+      if (!_foundPeers.any((d) => d.id == device.id)) {
+        setState(() {
+          _foundPeers.add(device);
+        });
       }
-      await AppLogger.log('Connection established.');
-    } catch (e) {
-      await AppLogger.log('Error establishing connection: $e');
-    }
+    });
+  }
+
+  void _connectToPeer(DiscoveredDevice device) async {
+    await bleController.connectToPeer(device, onMessage: _onMessage);
+    setState(() {
+      _connected = true;
+    });
   }
 
   void _onMessage(String msg) async {
@@ -50,8 +69,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void sendMessage() async {
     final text = _controller.text.trim();
-    if (text.isNotEmpty) {
-      await socketController.sendMessage(text);
+    if (text.isNotEmpty && _connected) {
+      await bleController.sendMessage(text);
       setState(() {
         messages.add("Me: $text");
         _controller.clear();
@@ -63,82 +82,103 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
-    socketController.close();
+    bleController.close();
     AppLogger.log('ChatScreen disposed.');
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    AppLogger.log('Building ChatScreen UI. isHost:  [${widget.isHost}, hostIp: ${widget.hostIp}');
+    AppLogger.log('Building ChatScreen UI. isHost: ${widget.isHost}');
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: Text(widget.isHost ? 'Host Chat' : 'Client Chat')),
+      appBar: AppBar(title: Text(_isHost ? 'BLE Host Chat' : 'BLE Client Chat')),
       body: Container(
         color: Colors.grey[50],
         child: Column(
           children: [
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
-                itemCount: messages.length,
-                itemBuilder: (_, i) {
-                  final isMe = messages[i].startsWith('Me:');
-                  final msg = messages[i].replaceFirst(RegExp(r'^(Me:|Peer:) '), '');
-                  return Align(
-                    alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(vertical: 4),
-                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: isMe ? Colors.blueAccent : Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Text(
-                        msg,
-                        style: TextStyle(
-                          color: isMe ? Colors.white : Colors.black87,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            Card(
-              margin: const EdgeInsets.fromLTRB(8, 0, 8, 12),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-              elevation: 2,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _controller,
-                        decoration: const InputDecoration(
-                          hintText: 'Type a message...',
-                          border: InputBorder.none,
-                        ),
-                        onSubmitted: (_) => sendMessage(),
-                      ),
-                    ),
-                    IconButton(
-                      onPressed: sendMessage,
-                      icon: const Icon(Icons.send, color: Colors.blueAccent),
-                    ),
-                  ],
+            if (!_connected && !_isHost)
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _foundPeers.length,
+                  itemBuilder: (_, i) {
+                    final device = _foundPeers[i];
+                    return ListTile(
+                      title: Text(device.name.isNotEmpty ? device.name : device.id),
+                      subtitle: Text(device.id),
+                      onTap: () => _connectToPeer(device),
+                    );
+                  },
                 ),
               ),
-            ),
+            if (_connected)
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+                  itemCount: messages.length,
+                  itemBuilder: (_, i) {
+                    final isMe = messages[i].startsWith('Me:');
+                    final msg = messages[i].replaceFirst(RegExp(r'^(Me:|Peer:) '), '');
+                    return Align(
+                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: isMe ? Colors.blueAccent : Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.04),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          msg,
+                          style: TextStyle(
+                            color: isMe ? Colors.white : Colors.black87,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            if (_connected)
+              Card(
+                margin: const EdgeInsets.fromLTRB(8, 0, 8, 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _controller,
+                          decoration: const InputDecoration(
+                            hintText: 'Type a message...',
+                            border: InputBorder.none,
+                          ),
+                          onSubmitted: (_) => sendMessage(),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: sendMessage,
+                        icon: const Icon(Icons.send, color: Colors.blueAccent),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (!_connected && _isHost)
+              const Padding(
+                padding: EdgeInsets.all(24.0),
+                child: Text('Waiting for BLE client to connect...', style: TextStyle(fontSize: 16)),
+              ),
           ],
         ),
       ),
